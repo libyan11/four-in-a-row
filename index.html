@@ -1,0 +1,1116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121633">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Four in a Row">
+<meta name="description" content="Play Four in a Row online with a friend on your phones, or against the computer on easy, medium or hard. Free, no sign-up: share a 4-letter room code.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect x=%274%27 y=%274%27 width=%2756%27 height=%2756%27 rx=%2712%27 fill=%27%232D5BD8%27/%3E%3Ccircle cx=%2722%27 cy=%2722%27 r=%279%27 fill=%27%23F2484F%27/%3E%3Ccircle cx=%2742%27 cy=%2722%27 r=%279%27 fill=%27%23F7C531%27/%3E%3Ccircle cx=%2722%27 cy=%2742%27 r=%279%27 fill=%27%23F7C531%27/%3E%3Ccircle cx=%2742%27 cy=%2742%27 r=%279%27 fill=%27%23F2484F%27/%3E%3C/svg%3E">
+<title>Four in a Row · Game Night</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@600;700;800&family=Manrope:wght@500;600;700;800&display=swap" media="print" onload="this.media='all'"><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@600;700;800&family=Manrope:wght@500;600;700;800&display=swap"></noscript>
+<script>/* connection tools load in the background, so the page shows at once; room actions wait for NET */window.NET=Promise.all(['vendor/peerjs-1.5.4.min.js','vendor/mqtt-5.10.1.min.js'].map(function(s){return new Promise(function(r){var e=document.createElement('script');e.src=s;e.async=false;e.onload=e.onerror=function(){r()};document.head.appendChild(e)})})).then(function(){window.NET_DONE=1});</script>
+<style>
+/* Layout: a deep blue upright frame in the middle of the screen. The two players sit above it, your status and the next-game button below it. Tap anywhere in a column to drop a disc. */
+:root {
+  --bg: #121633;
+  --bg-2: #0B0E24;
+  --bg-glow: #232A5E;
+  --panel: #171C40;
+  --shade: rgba(0, 0, 0, .24);
+  --ink: #F3F2FA;
+  --muted: #A7ABD0;
+  --line: rgba(243, 242, 250, .14);
+  --frame: #2D5BD8;
+  --frame-deep: #1E3F9E;
+  --hole: #0D1130;
+  --p0: #F2484F;  --p0-deep: #B82730;
+  --p1: #F7C531;  --p1-deep: #C08F06;
+  --accent: #F7C531;
+  --on-accent: #2A1E00;
+  --good: #79D7A0;
+  --danger: #FF8A80;
+  --shadow: rgba(0, 0, 0, .5);
+  --backdrop: rgba(6, 8, 22, .76);
+  --f-display: 'Rubik', 'Trebuchet MS', system-ui, sans-serif;
+  --f-body: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background-color: var(--bg);
+  background-image: radial-gradient(ellipse at 50% 40%, var(--bg-glow), var(--bg) 60%, var(--bg-2));
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.4;
+  padding-left: max(14px, env(safe-area-inset-left, 0px));
+  padding-right: max(14px, env(safe-area-inset-right, 0px));
+  overflow-x: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+#app { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; line-height: 1.1; font-weight: 800; text-wrap: balance; }
+
+.screen { min-height: 100%; display: grid; place-items: center; padding-block: max(20px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-bottom, 0px)); }
+.panel { width: min(100%, 460px); display: flex; flex-direction: column; gap: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 24px 20px; box-shadow: 0 20px 50px var(--shadow); }
+.logo { font-size: 34px; display: flex; align-items: center; gap: 12px; }
+.logo-mark { display: grid; grid-template-columns: repeat(2, 16px); gap: 4px; padding: 5px; border-radius: 8px; background: var(--frame); flex: none; }
+.logo-mark i { width: 16px; height: 16px; border-radius: 50%; }
+.tagline { margin: 6px 0 0; color: var(--muted); }
+.block { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.block h3 { font-size: 17px; font-weight: 700; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row > * { min-width: 0; }
+.grow { flex: 1; }
+.input { font: inherit; font-size: 16px; min-height: 46px; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-2); color: var(--ink); width: 100%; }
+.code-input { text-transform: uppercase; letter-spacing: .3em; font-weight: 800; }
+.msg { min-height: 20px; font-weight: 700; font-size: 13.5px; color: var(--muted); }
+.msg.err { color: var(--danger); }
+.note { font-size: 13px; color: var(--muted); margin: 0; }
+.eyebrow { font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.room-code { font-family: var(--f-display); font-weight: 800; font-size: 48px; letter-spacing: .16em; color: var(--accent); line-height: 1; }
+.share { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.share code { background: var(--bg-2); border: 1px solid var(--line); padding: 6px 9px; border-radius: 8px; word-break: break-all; flex: 1; min-width: 0; font-family: var(--f-body); }
+.plist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.plist li { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: var(--shade); border: 1px solid var(--line); }
+.plist .nm { font-weight: 800; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.disc-dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
+.disc-dot.p0 { background: var(--p0); } .disc-dot.p1 { background: var(--p1); }
+.disc-dot.off { opacity: .35; }
+.x { border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 6px 12px; min-height: 36px; font-size: 13px; font-weight: 700; }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); font-weight: 700; }
+
+/* Game */
+#app { height: 100%; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; padding-block: max(8px, env(safe-area-inset-top, 0px)) max(8px, env(safe-area-inset-bottom, 0px)); }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand h1 { font-size: 21px; }
+.brand p { margin: 1px 0 0; font-size: 11px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; font-weight: 700; }
+.net { color: var(--good); }
+.net.warn { color: var(--accent); }
+.top-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.ghost { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; min-height: 38px; font-size: 13px; font-weight: 700; color: var(--ink); }
+@media (hover: hover) { .ghost:hover { border-color: var(--accent); } }
+#btnMenu { display: none; }
+.menu-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.menu-list .btn { text-align: left; }
+
+.vs { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; }
+.pl { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 14px; background: var(--shade); border: 1px solid var(--line); min-width: 0; transition: border-color .2s, box-shadow .2s; }
+.pl.right { flex-direction: row-reverse; text-align: right; }
+.pl.is-turn.p0 { border-color: var(--p0); box-shadow: 0 0 0 2px var(--p0); }
+.pl.is-turn.p1 { border-color: var(--p1); box-shadow: 0 0 0 2px var(--p1); }
+.pl .disc-dot { width: 26px; height: 26px; box-shadow: inset 0 -3px 0 rgba(0,0,0,.25); }
+.pl-text { min-width: 0; }
+.pl-name { font-weight: 800; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-name small { font-weight: 700; color: var(--muted); font-size: 10px; letter-spacing: .05em; margin: 0 3px; }
+.pl-name small.away { color: var(--danger); }
+.pl-sub { font-size: 11.5px; color: var(--muted); font-weight: 700; }
+.score { font-family: var(--f-display); font-weight: 800; font-size: 24px; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+
+.board-wrap { flex: 1; min-height: 0; display: grid; place-items: center; container-type: size; }
+.board { --cell: min(calc(100cqw / 7), calc(100cqh / 6.35)); position: relative; width: calc(var(--cell) * 7); padding: calc(var(--cell) * .08); border-radius: calc(var(--cell) * .28); background: linear-gradient(180deg, var(--frame), var(--frame-deep)); box-shadow: 0 16px 40px var(--shadow), inset 0 2px 0 rgba(255,255,255,.18); display: grid; grid-template-columns: repeat(7, 1fr); }
+.col { position: relative; display: grid; grid-template-rows: repeat(6, 1fr); padding: 0; border: 0; background: transparent; border-radius: calc(var(--cell) * .2); }
+.col:disabled { cursor: default; }
+.col.can:hover, .col.can:focus-visible { background: rgba(255,255,255,.08); }
+.cell { width: calc(var(--cell) * .84 - 1px); aspect-ratio: 1; margin: calc(var(--cell) * .04); border-radius: 50%; background: var(--hole); box-shadow: inset 0 3px 6px rgba(0,0,0,.6); position: relative; overflow: visible; }
+.disc { position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 -4px 0 rgba(0,0,0,.22), inset 0 3px 0 rgba(255,255,255,.25); }
+.disc::after { content: ""; position: absolute; inset: 22%; border-radius: 50%; border: 2px solid rgba(0,0,0,.12); }
+.disc.p0 { background: var(--p0); } .disc.p1 { background: var(--p1); }
+.disc.drop { animation: drop var(--dur, .4s) cubic-bezier(.5, 0, .75, 0) both, bounce .18s ease-out var(--dur, .4s); }
+@keyframes drop { from { transform: translateY(var(--from)); } to { transform: none; } }
+@keyframes bounce { 0% { transform: none; } 50% { transform: translateY(-8%); } 100% { transform: none; } }
+.disc.win { animation: glow 1s ease-in-out infinite; }
+@keyframes glow { 0%, 100% { box-shadow: 0 0 0 3px #fff, inset 0 -4px 0 rgba(0,0,0,.22); } 50% { box-shadow: 0 0 0 6px rgba(255,255,255,.55), inset 0 -4px 0 rgba(0,0,0,.22); } }
+.disc.last::before { content: ""; position: absolute; left: 50%; top: 50%; width: 18%; height: 18%; transform: translate(-50%, -50%); border-radius: 50%; background: rgba(255,255,255,.85); }
+.disc.ghost { opacity: .35; }
+.board.dim .disc:not(.win) { filter: saturate(.55) brightness(.8); }
+
+.bar { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: var(--shade); border: 1px solid var(--line); min-height: 64px; }
+.bar.my-turn { border-color: var(--accent); }
+.bar-text { flex: 1; min-width: 0; }
+.status { font-size: 15px; font-weight: 800; }
+.bar.my-turn .status { color: var(--accent); }
+.sub { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.btn { border-radius: 12px; padding: 12px 16px; font-weight: 800; font-size: 15px; border: 1px solid var(--line); background: var(--shade); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:not(:disabled):hover { filter: brightness(.92); }
+
+.modal { position: fixed; inset: 0; z-index: 20; background: var(--backdrop); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.sheet { width: min(100%, 500px); max-height: 100%; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 22px 20px; box-shadow: 0 20px 50px var(--shadow); }
+.sheet h2 { font-size: 25px; margin-bottom: 4px; }
+.sheet h2 span { color: var(--accent); }
+.sheet .lede { color: var(--muted); margin: 0 0 14px; }
+.sheet ul.rules { margin: 0 0 16px; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; }
+.sheet ul.rules b { color: var(--accent); }
+.order { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.order li { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: var(--shade); border: 1px solid var(--line); }
+.order li.me-row { border-color: var(--accent); }
+.order .nm { font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.order .pts { font-variant-numeric: tabular-nums; font-weight: 800; text-align: right; }
+.order .pts small { display: block; color: var(--muted); font-weight: 600; font-size: 11px; }
+.sheet-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+@media (max-width: 560px) {
+  #btnRules, #btnScores, #btnLeave { display: none; }
+  #btnMenu { display: inline-block; }
+  .room-code { font-size: 40px; }
+  .pl { padding: 6px 8px; gap: 7px; }
+  .pl .disc-dot { width: 20px; height: 20px; }
+  .score { font-size: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+
+<section class="screen" id="home" hidden>
+  <div class="panel">
+    <div>
+      <h1 class="logo"><span class="logo-mark" aria-hidden="true"><i style="background:var(--p0)"></i><i style="background:var(--p1)"></i><i style="background:var(--p1)"></i><i style="background:var(--p0)"></i></span>Four in a Row</h1>
+      <p class="tagline">Drop your discs and line up four before your opponent does: across, up or diagonal.</p>
+    </div>
+    <label class="eyebrow" for="hName">Your name</label>
+    <input class="input" id="hName" maxlength="14" autocomplete="nickname" placeholder="Type your name">
+    <div class="block">
+      <h3>Play with a friend</h3>
+      <div id="onlineBox" class="row" style="flex-direction: column;">
+        <button class="btn primary" id="hCreate" type="button">Create a room</button>
+        <form class="row" id="joinForm">
+          <input class="input code-input grow" id="hCode" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false" style="width:auto">
+          <button class="btn" id="hJoin" type="submit">Join room</button>
+        </form>
+        <button class="btn" id="hReopen" type="button" hidden>Reopen your room</button>
+      </div>
+      <p class="note" id="onlineNote" hidden>Online rooms work on the website, not inside this preview: <a href="https://libyan11.github.io/four-in-a-row/" target="_blank" rel="noopener">libyan11.github.io/four-in-a-row</a></p>
+    </div>
+    <div class="block">
+      <h3>Play against the computer</h3>
+      <div class="row">
+        <select class="input grow" id="hLevel" style="width:auto" aria-label="Computer strength">
+          <option value="easy">Easy</option>
+          <option value="medium" selected>Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+        <button class="btn" id="hSolo" type="button">Play</button>
+      </div>
+      <button class="btn" id="hContinue" type="button" hidden>Continue your game</button>
+    </div>
+    <p class="msg" id="homeMsg" aria-live="polite"></p>
+    <div class="row"><button class="ghost" id="hRules" type="button">Rules</button></div>
+  </div>
+</section>
+
+<section class="screen" id="lobby" hidden>
+  <div class="panel">
+    <div>
+      <p class="eyebrow">Room code</p>
+      <div class="room-code" id="lCode">····</div>
+      <p class="note" id="lNet">Opening room…</p>
+    </div>
+    <div class="share">
+      <code id="lLink"></code>
+      <button class="ghost" id="lCopy" type="button">Copy link</button>
+    </div>
+    <p class="note" id="lCopyMsg" aria-live="polite"></p>
+    <div class="block">
+      <h3 id="lCount">Players</h3>
+      <ul class="plist" id="lPlayers"></ul>
+      <div class="row" id="lHost" style="flex-direction: column;">
+        <label class="field" id="lLevelBox">Computer strength
+          <select class="input" id="lLevel"><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select>
+        </label>
+        <button class="btn" id="lAddBot" type="button">Play the computer instead</button>
+        <button class="btn primary" id="lStart" type="button">Start game</button>
+      </div>
+      <p class="note" id="lNote"></p>
+    </div>
+    <div class="row"><button class="ghost" id="lRules" type="button">Rules</button><button class="ghost" id="lLeave" type="button">Leave room</button></div>
+  </div>
+</section>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="brand">
+      <h1>Four in a Row</h1>
+      <p><span id="gameNo">Game 1</span> <span class="net" id="net"></span></p>
+    </div>
+    <div class="top-actions">
+      <button class="ghost" id="btnRules" type="button">Rules</button>
+      <button class="ghost" id="btnScores" type="button">Scores</button>
+      <button class="ghost" id="btnLeave" type="button">Leave</button>
+      <button class="ghost" id="btnMenu" type="button" aria-label="Menu: rules, scores, leave">Menu</button>
+    </div>
+  </header>
+
+  <section class="vs" id="vs" aria-label="Players"></section>
+
+  <div class="board-wrap">
+    <div class="board" id="board" role="grid" aria-label="Board: 7 columns, 6 rows"></div>
+  </div>
+
+  <section class="bar" id="bar">
+    <div class="bar-text">
+      <div class="status" id="status" aria-live="polite"></div>
+      <div class="sub" id="sub"></div>
+    </div>
+    <button class="btn primary" id="btnNext" type="button" hidden>Play again</button>
+  </section>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= constants & helpers ================= */
+const W = 7, H = 6;
+const BOT_NAMES = { easy: 'Computer', medium: 'Computer', hard: 'Computer' };
+const LEVEL_NAME = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+const DEPTH = { easy: 2, medium: 5, hard: 8 };
+const MAX_PLAYERS = 2, MIN_PLAYERS = 2;
+const COLOR = ['Red', 'Yellow'];
+
+const LS = (() => { try { return window.localStorage; } catch (e) { return null; } })();
+const SS = (() => { try { return window.sessionStorage; } catch (e) { return null; } })();
+function getItem(st, k) { try { const v = st && st.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+function setItem(st, k, v) { try { if (!st) return; if (v == null) st.removeItem(k); else st.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } }
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const rid = () => Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+
+const me = (() => { let id = getItem(SS, 'fr-id'); if (!id) { id = rid(); setItem(SS, 'fr-id', id); } return id; })();
+let myName = getItem(LS, 'fr-name') || '';
+const onlineOK = !/claude|anthropic/i.test(location.hostname) && location.protocol !== 'data:';
+
+let role = null;      // 'solo' | 'host' | 'guest' | null
+let roomCode = '';
+let S = null;         // full game state (solo and host only)
+let V = null;         // what this screen shows
+let timer = null, token = 0;
+let animSeq = 0, animInit = false;
+let homeMsg = '', homeErr = false;
+
+/* ---- pure rules: board is an array of 42, index r*7+c, row 0 at the top; -1 empty, 0 or 1 a disc ---- */
+function emptyBoard() { return Array(W * H).fill(-1); }
+function dropRow(b, c) { for (let r = H - 1; r >= 0; r--) if (b[r * W + c] < 0) return r; return -1; }
+function winLine(b, i) {
+  /* the four (or more) in a row through cell i, or null */
+  const p = b[i], r0 = Math.floor(i / W), c0 = i % W;
+  for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+    const line = [i];
+    for (const s of [1, -1]) {
+      let r = r0 + dr * s, c = c0 + dc * s;
+      while (r >= 0 && r < H && c >= 0 && c < W && b[r * W + c] === p) { line.push(r * W + c); r += dr * s; c += dc * s; }
+    }
+    if (line.length >= 4) return line;
+  }
+  return null;
+}
+/* ---- the computer: alpha-beta search, centre columns first, scored by open windows of four ---- */
+const WINDOWS = (() => {
+  const w = [];
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+    const r3 = r + dr * 3, c3 = c + dc * 3;
+    if (r3 < 0 || r3 >= H || c3 < 0 || c3 >= W) continue;
+    w.push([0, 1, 2, 3].map(k => (r + dr * k) * W + c + dc * k));
+  }
+  return w;
+})();
+const ORDER = [3, 2, 4, 1, 5, 0, 6];
+function evaluate(b, p) {
+  let s = 0;
+  for (let r = 0; r < H; r++) { if (b[r * W + 3] === p) s += 3; else if (b[r * W + 3] === 1 - p) s -= 3; }
+  for (const w of WINDOWS) {
+    let mine = 0, theirs = 0;
+    for (const i of w) { if (b[i] === p) mine++; else if (b[i] === 1 - p) theirs++; }
+    if (mine && theirs) continue;
+    if (mine === 3) s += 5; else if (mine === 2) s += 2;
+    if (theirs === 3) s -= 4; else if (theirs === 2) s -= 2;
+  }
+  return s;
+}
+function negamax(b, p, depth, alpha, beta, moves) {
+  if (moves === W * H) return 0;
+  if (depth === 0) return evaluate(b, p);
+  for (const c of ORDER) { const r = dropRow(b, c); if (r < 0) continue; const i = r * W + c; b[i] = p; const w = winLine(b, i); b[i] = -1; if (w) return 1000 - moves; }
+  let best = -Infinity;
+  for (const c of ORDER) {
+    const r = dropRow(b, c); if (r < 0) continue;
+    const i = r * W + c;
+    b[i] = p;
+    const v = -negamax(b, 1 - p, depth - 1, -beta, -alpha, moves + 1);
+    b[i] = -1;
+    if (v > best) best = v;
+    if (v > alpha) alpha = v;
+    if (alpha >= beta) break;
+  }
+  return best;
+}
+function botColumn(board, p, level) {
+  const b = board.slice();
+  const moves = b.filter(x => x >= 0).length;
+  const legal = ORDER.filter(c => dropRow(b, c) >= 0);
+  /* always take a win and block an immediate loss, even on easy */
+  for (const who of [p, 1 - p]) for (const c of legal) { const i = dropRow(b, c) * W + c; b[i] = who; const w = winLine(b, i); b[i] = -1; if (w) return c; }
+  if (level === 'easy' && Math.random() < 0.35) return legal[Math.floor(Math.random() * legal.length)];
+  let best = legal[0], bs = -Infinity;
+  for (const c of legal) {
+    const i = dropRow(b, c) * W + c;
+    b[i] = p;
+    const v = -negamax(b, 1 - p, DEPTH[level] - 1, -Infinity, Infinity, moves + 1) + (level === 'hard' ? 0 : Math.random() * 1.5);
+    b[i] = -1;
+    if (v > bs) { bs = v; best = c; }
+  }
+  return best;
+}
+
+/* ================= game engine (runs on the host / solo device) ================= */
+function newPlayer(id, name, bot) { return { id, name, bot: !!bot, online: true, wins: 0, last: '' }; }
+function idxOf(pid) { return S.players.findIndex(p => p.id === pid); }
+function isAuto(p) { return p.bot || !p.online; }
+function addLog(t) { S.log.push(t); if (S.log.length > 60) S.log.shift(); }
+
+function baseState(mode, level) {
+  return { v: 1, mode, hostId: me, players: [], waiting: [], phase: 'lobby', level: DEPTH[level] ? level : 'medium', game: 0, draws: 0,
+    board: emptyBoard(), turn: 0, starter: 1, moves: 0, last: null, seq: 0, win: null, result: null, log: [] };
+}
+function seatWaiting() {
+  while (S.waiting.length) {
+    const w = S.waiting[0];
+    if (S.players.length < MAX_PLAYERS) S.players.push(newPlayer(w.id, w.name, false));
+    else {
+      const b = S.players.map(p => p.bot).lastIndexOf(true);
+      if (b < 0) break;
+      S.players[b] = newPlayer(w.id, w.name, false);
+    }
+    S.players[S.players.length - 1].online = w.online !== false;
+    S.waiting.shift();
+  }
+}
+function newGame() {
+  token++; clearTimeout(timer);
+  seatWaiting();
+  S.game++; S.phase = 'play'; S.board = emptyBoard(); S.moves = 0; S.last = null; S.win = null; S.result = null;
+  S.starter = 1 - S.starter;              // the first move swaps every game
+  S.turn = S.starter;
+  addLog(`Game ${S.game}: ${S.players[S.turn].name} goes first.`);
+  step();
+}
+function schedule(fn, ms) {
+  clearTimeout(timer);
+  const t = token;
+  timer = setTimeout(() => { if (t === token) fn(); }, ms);
+}
+function step() {
+  changed();
+  if (S.phase !== 'play') return;
+  const p = S.players[S.turn];
+  if (!isAuto(p)) return;
+  const fall = S.last ? 250 + S.last.r * 60 : 0;
+  schedule(() => { if (S.phase === 'play') doDrop(S.turn, botColumn(S.board, S.turn, p.bot ? S.level : 'medium')); }, fall + (p.bot ? 450 : 12000));
+}
+function doDrop(pi, c) {
+  clearTimeout(timer);
+  if (S.phase !== 'play' || S.turn !== pi || !(c >= 0 && c < W)) return;
+  const r = dropRow(S.board, c);
+  if (r < 0) return;
+  const i = r * W + c;
+  S.board[i] = pi; S.moves++;
+  S.last = { seq: ++S.seq, c, r, pi };
+  S.players[pi].last = `column ${c + 1}`;
+  const w = winLine(S.board, i);
+  if (w) {
+    S.win = w; S.result = { winner: pi }; S.phase = 'over'; S.players[pi].wins++;
+    addLog(`${S.players[pi].name} lines up four and wins game ${S.game}.`);
+  } else if (S.moves === W * H) {
+    S.result = { winner: null }; S.phase = 'over'; S.draws++;
+    addLog(`Game ${S.game} is a draw: the board is full.`);
+  } else S.turn = 1 - pi;
+  step();
+}
+
+/* host-side handling of every player's actions */
+function handleAct(pid, act, data) {
+  if (!S) return;
+  data = data || {};
+  const pi = idxOf(pid);
+  const isHost = pid === S.hostId;
+  if (act === 'drop') { if (pi >= 0) doDrop(pi, +data.c); }
+  else if (act === 'next') { if (S.phase === 'over' && (isHost || pi >= 0)) newGame(); }
+  else if (!isHost) return;
+  else if (act === 'addBot') {
+    if (S.phase !== 'lobby' || S.players.length >= MAX_PLAYERS) return;
+    S.players.push(newPlayer('bot-' + rid(), BOT_NAMES[S.level], true));
+    changed();
+  } else if (act === 'remove') {
+    if (S.phase !== 'lobby' || data.id === S.hostId) return;
+    const i = idxOf(data.id);
+    if (i < 0) return;
+    S.players.splice(i, 1);
+    conns.forEach(c => { if (c.pid === data.id) { try { c.send({ t: 'kicked' }); } catch (e) { /* gone */ } } });
+    changed();
+  } else if (act === 'settings') {
+    if (S.phase !== 'lobby' || !DEPTH[data.level]) return;
+    S.level = data.level;
+    S.players.forEach(p => { if (p.bot) p.name = BOT_NAMES[S.level]; });
+    changed();
+  } else if (act === 'start') {
+    if (S.phase !== 'lobby' || S.players.length < MIN_PLAYERS) return;
+    newGame();
+  } else if (act === 'lobby') {
+    if (S.phase !== 'over') return;
+    seatWaiting();
+    S.phase = 'lobby';
+    changed();
+  }
+}
+
+/* nothing is hidden in this game, so everyone sees the same board */
+function viewFor(pid) {
+  const v = JSON.parse(JSON.stringify({
+    mode: S.mode, phase: S.phase, level: S.level, game: S.game, draws: S.draws, board: S.board, turn: S.turn, moves: S.moves,
+    last: S.last, win: S.win, result: S.result, log: S.log, hostId: S.hostId, waiting: S.waiting.map(w => w.name),
+    players: S.players.map(p => ({ id: p.id, name: p.name, bot: p.bot, online: p.online, wins: p.wins, last: p.last }))
+  }));
+  v.me = S.players.findIndex(p => p.id === pid);
+  return v;
+}
+
+function changed() {
+  if (role === 'host') broadcast();
+  if (role === 'host' || role === 'solo') {
+    V = viewFor(me);
+    if (role === 'solo') setItem(LS, 'fr-solo', S);
+    else setItem(LS, 'fr-host', { code: roomCode, S });
+  }
+  render();
+}
+
+/* ================= networking (host-authoritative rooms) =================
+   A direct phone-to-phone link (PeerJS) is tried first. Public MQTT relays carry the same
+   messages as a backup when a network blocks the direct link. */
+const PEER_PREFIX = 'gamenight-four-room-';
+const RELAYS = [
+  ['wss://public.cloud.shiftr.io:443', { username: 'public', password: 'public' }],
+  ['wss://broker.hivemq.com:8884/mqtt', {}],
+  ['wss://broker.emqx.io:8084/mqtt', {}]
+];
+const RELAY_ROOT = 'gamenight-four-v1/';
+let peer = null, hostConn = null, link = null, everConnected = false;
+const conns = new Set(), relayConns = new Map();
+let stateSeq = 0, hostSess = '', lastState = { hs: null, sv: 0 };
+let fallbackTimer = 0, giveUpTimer = 0, retryTimer = 0, helloIv = 0, beatIv = 0, lastHostMsg = 0;
+const relay = { clients: [], seq: 0, sess: '', seen: new Map() };
+
+function netReady() { return typeof Peer !== 'undefined' || typeof mqtt !== 'undefined'; }
+let netWait = false;
+function waitNet(fn) { if (window.NET_DONE) return false; if (!netWait) { netWait = true; NET.then(() => { netWait = false; fn(); }); } return true; }
+function newCode() { const a = 'ABCDEFGHJKMNPQRSTUVWXYZ'; let c = ''; for (let i = 0; i < 4; i++) c += a[Math.floor(Math.random() * a.length)]; return c; }
+function peerIdFor(code) { return PEER_PREFIX + code.toLowerCase(); }
+function roomTopic(rest) { return 'room/' + roomCode.toLowerCase() + '/' + rest; }
+let netText = '', netWarn = false;
+function setNet(text, warn) { netText = text || ''; netWarn = !!warn; renderNet(); }
+
+function relayStart(listen, onMsg) {
+  relayStop();
+  if (typeof mqtt === 'undefined') return;
+  relay.sess = Math.random().toString(36).slice(2, 8);
+  const topic = RELAY_ROOT + listen;
+  relay.clients = RELAYS.map(([url, o]) => {
+    let c;
+    try { c = mqtt.connect(url, Object.assign({}, o, { clientId: 'fr-' + me + '-' + Math.random().toString(36).slice(2, 6), connectTimeout: 10000, reconnectPeriod: 4000, keepalive: 30 })); }
+    catch (e) { return null; }
+    c.on('connect', () => c.subscribe(topic));
+    c.on('message', (t, buf) => {
+      let env; try { env = JSON.parse(buf.toString()); } catch (e) { return; }
+      if (!env || !env.id || env.f === me || relay.seen.has(env.id)) return;
+      relay.seen.set(env.id, 1);
+      if (relay.seen.size > 600) relay.seen.delete(relay.seen.keys().next().value);
+      onMsg(env.m, String(env.f || ''));
+    });
+    c.on('error', () => {});
+    return c;
+  }).filter(Boolean);
+}
+function relaySend(to, m) {
+  const env = JSON.stringify({ f: me, id: me + '.' + relay.sess + '.' + (++relay.seq), m });
+  relay.clients.forEach(c => { if (c.connected) { try { c.publish(RELAY_ROOT + to, env); } catch (e) { /* skip */ } } });
+}
+function relayStop() {
+  relay.clients.forEach(c => { try { c.end(true); } catch (e) { /* skip */ } });
+  relay.clients = []; relay.seen.clear();
+}
+
+/* ---- host ---- */
+function broadcast() {
+  const sv = ++stateSeq;
+  conns.forEach(c => { if (c.open && c.pid) { try { c.send({ t: 'state', v: viewFor(c.pid), hs: hostSess, sv }); } catch (e) { /* dropped */ } } });
+}
+function startHostRelay() {
+  relayConns.clear();
+  relayStart(roomTopic('host'), (m, f) => {
+    if (role !== 'host' || !m || !f) return;
+    let c = relayConns.get(f);
+    if (!c) {
+      if (m.t !== 'hello') return;
+      c = { relay: true, from: f, pid: null, open: true, seen: 0, send: x => relaySend(roomTopic('g/' + f), x), close() { this.open = false; } };
+      relayConns.set(f, c);
+    }
+    c.seen = Date.now();
+    if (m.t !== 'ping') hostReceive(c, m);
+  });
+  clearInterval(beatIv);
+  /* every guest pings every 5s; anyone silent for 15-20s is treated as gone, and the computer covers their turns */
+  beatIv = setInterval(() => {
+    const now = Date.now();
+    relayConns.forEach((c, f) => { if (now - c.seen > 20000) { relayConns.delete(f); c.open = false; hostDrop(c); } });
+    conns.forEach(c => {
+      if (!c.relay && c.seen && now - c.seen > 15000) { try { c.close(); } catch (e) { /* skip */ } hostDrop(c); }
+      else { try { c.send({ t: 'ping' }); } catch (e) { /* skip */ } }
+    });
+  }, 5000);
+}
+function openHostPeer(attempt) {
+  attempt = attempt || 0;
+  if (typeof Peer === 'undefined') { setNet('Room open · backup link'); return; }
+  setNet('Opening room…', true);
+  peer = new Peer(peerIdFor(roomCode), { debug: 1 });
+  peer.on('open', () => setNet('Room open'));
+  peer.on('connection', c => {
+    c.on('data', m => hostReceive(c, m));
+    c.on('close', () => hostDrop(c));
+    c.on('error', () => hostDrop(c));
+  });
+  peer.on('disconnected', () => { setNet('Reconnecting…', true); setTimeout(() => { try { if (peer && !peer.destroyed) peer.reconnect(); } catch (e) { /* skip */ } }, 1500); });
+  peer.on('error', e => {
+    if (e.type === 'unavailable-id' && attempt < 12) {
+      setNet('Reopening room…', true);
+      try { peer.destroy(); } catch (x) { /* skip */ }
+      setTimeout(() => { if (role === 'host') openHostPeer(attempt + 1); }, 3000);
+    } else if (e.type !== 'peer-unavailable') setNet('Connection problem (' + e.type + ')', true);
+  });
+}
+function hostReceive(c, m) {
+  if (!m || typeof m !== 'object' || !S) return;
+  c.seen = Date.now();
+  if (m.t === 'ping') return;
+  if (m.t === 'away' && c.pid) {
+    conns.delete(c);
+    const p = S.players.find(x => x.id === c.pid);
+    if (p) p.online = false;
+    const w = S.waiting.find(x => x.id === c.pid);
+    if (w) w.online = false;
+    afterPresence();
+    return;
+  }
+  if (m.t === 'hello') {
+    const pid = String(m.cid || '').slice(0, 24);
+    if (!pid || pid === S.hostId) { try { c.close(); } catch (e) { /* skip */ } return; }
+    const name = String(m.name || '').trim().slice(0, 14) || 'Player';
+    c.pid = pid; conns.add(c);
+    let p = S.players.find(x => x.id === pid);
+    if (!p) {
+      p = S.players.find(x => !x.bot && !x.online && x.id !== S.hostId && x.name.toLowerCase() === name.toLowerCase());
+      if (p) p.id = pid;
+    }
+    if (p) { p.name = name; p.online = true; afterPresence(); return; }
+    const w = S.waiting.find(x => x.id === pid);
+    if (w) { w.name = name; w.online = true; changed(); return; }
+    if (S.phase === 'lobby') {
+      if (S.players.length < MAX_PLAYERS) S.players.push(newPlayer(pid, name, false));
+      else {
+        const b = S.players.map(x => x.bot).lastIndexOf(true);
+        if (b < 0) { try { c.send({ t: 'full' }); } catch (e) { /* skip */ } conns.delete(c); return; }
+        S.players[b] = newPlayer(pid, name, false);
+      }
+    } else S.waiting.push({ id: pid, name, online: true });
+    addLog(`${name} joined the room.`);
+    changed();
+    return;
+  }
+  if (m.t === 'bye' && c.pid) {
+    const i = idxOf(c.pid);
+    if (S.phase === 'lobby' && i >= 0) S.players.splice(i, 1);
+    S.waiting = S.waiting.filter(w => w.id !== c.pid);
+    conns.delete(c);
+    if (S.phase !== 'lobby' && i >= 0 && S.players[i] && S.players[i].id === c.pid) { S.players[i].online = false; afterPresence(); return; }
+    changed();
+    return;
+  }
+  if (m.t === 'act' && c.pid) handleAct(c.pid, String(m.act), m.data);
+}
+function hostDrop(c) {
+  if (!conns.has(c)) return;
+  conns.delete(c);
+  if (c.pid && ![...conns].some(x => x.pid === c.pid)) {
+    const p = S && S.players.find(x => x.id === c.pid);
+    if (p) p.online = false;
+    const w = S && S.waiting.find(x => x.id === c.pid);
+    if (w) w.online = false;
+    afterPresence();
+  }
+}
+function afterPresence() {
+  if (!S) return;
+  if (S.phase === 'play') step(); else changed();
+}
+function normalizeHost() {
+  S.players.forEach(p => { if (!p.bot) p.online = p.id === me; });
+  S.waiting.forEach(w => { w.online = false; });
+  token++; clearTimeout(timer);
+  if (S.phase === 'play') step();
+}
+
+/* ---- guest ---- */
+function joinRoom(code) {
+  role = 'guest'; roomCode = code; V = null; everConnected = false; link = null; lastState = { hs: null, sv: 0 };
+  homeMsg = 'Connecting to room ' + code + '…'; homeErr = false;
+  render();
+  setNet('Connecting…', true);
+  relayStart(roomTopic('g/' + me), guestRelayMsg);
+  clearTimeout(fallbackTimer); fallbackTimer = setTimeout(useRelay, 4000);
+  clearTimeout(giveUpTimer);
+  giveUpTimer = setTimeout(() => {
+    if (role === 'guest' && !everConnected) leave(`Couldn't reach room ${code}. Check the code, and that the host still has the game open.`);
+  }, 25000);
+  clearInterval(beatIv);
+  beatIv = setInterval(() => {
+    if (role !== 'guest' || !link || !hostConn) return;
+    try { hostConn.send({ t: 'ping' }); } catch (e) { /* skip */ }
+    if (Date.now() - lastHostMsg > 16000) {
+      setNet('Lost the host. Reconnecting…', true);
+      if (link === 'relay') hostConn.send({ t: 'hello', cid: me, name: myName });
+      else { link = null; hostConn = null; lastHostMsg = Date.now(); retryLater(); useRelay(); }
+    }
+  }, 5000);
+  if (typeof Peer === 'undefined') { useRelay(); return; }
+  peer = new Peer({ debug: 1 });
+  peer.on('open', connectHost);
+  peer.on('disconnected', () => { setTimeout(() => { try { if (peer && !peer.destroyed) peer.reconnect(); } catch (e) { /* skip */ } }, 1500); });
+  peer.on('error', e => {
+    if (link === 'relay') return;
+    useRelay();
+    setNet(e.type === 'peer-unavailable' ? (everConnected ? 'Host not reachable. Retrying…' : 'Trying another way to reach the room…') : 'Connection problem. Retrying…', true);
+    retryLater();
+  });
+}
+function linked(how) {
+  everConnected = true; link = how; clearTimeout(giveUpTimer); lastHostMsg = Date.now();
+  setNet('Connected' + (how === 'relay' ? ' · backup link' : ''));
+  setItem(LS, 'fr-guest', { code: roomCode });
+}
+function useRelay() {
+  if (role !== 'guest' || link === 'peer' || helloIv) return;
+  const hello = () => {
+    if (role !== 'guest' || link) { clearInterval(helloIv); helloIv = 0; return; }
+    relaySend(roomTopic('host'), { t: 'hello', cid: me, name: myName });
+  };
+  helloIv = setInterval(hello, 2000); hello();
+}
+function relayHostConn() { return { relay: true, open: true, send: m => relaySend(roomTopic('host'), m) }; }
+function guestRelayMsg(m) {
+  if (role !== 'guest' || !m) return;
+  lastHostMsg = Date.now();
+  if (m.t !== 'state' && m.t !== 'full' && m.t !== 'kicked' && m.t !== 'closed') return;
+  if (m.t === 'state' && link !== 'peer' && link !== 'relay') { hostConn = relayHostConn(); linked('relay'); }
+  else if (link === 'relay') setNet('Connected · backup link');
+  if (link === 'relay' || m.t !== 'state') guestMsg(m);
+}
+function guestMsg(m) {
+  if (!m) return;
+  if (m.t === 'full') { leave('That room is full. Four in a Row rooms hold 2 players.'); return; }
+  if (m.t === 'kicked') { leave('The host removed you from the room.'); return; }
+  if (m.t === 'closed') { leave('The host closed the room.'); return; }
+  if (m.t !== 'state') return;
+  if (m.hs === lastState.hs && m.sv <= lastState.sv) return;
+  lastState = { hs: m.hs, sv: m.sv };
+  V = m.v;
+  render();
+}
+function connectHost() {
+  if (!peer || peer.destroyed || role !== 'guest') return;
+  const c = peer.connect(peerIdFor(roomCode), { reliable: true });
+  if (!link) hostConn = c;
+  c.on('open', () => { hostConn = c; c.send({ t: 'hello', cid: me, name: myName }); linked('peer'); });
+  c.on('data', m => { if (link === 'peer' && hostConn === c) { lastHostMsg = Date.now(); guestMsg(m); } });
+  c.on('close', () => {
+    if (role === 'guest' && hostConn === c) { link = null; hostConn = null; setNet('Lost the host. Reconnecting…', true); retryLater(); useRelay(); }
+  });
+}
+function retryLater() {
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => {
+    if (!peer || peer.destroyed || role !== 'guest') return;
+    if (peer.disconnected) { try { peer.reconnect(); } catch (e) { /* skip */ } setTimeout(connectHost, 1500); }
+    else connectHost();
+  }, 2500);
+}
+
+/* ---- shared ---- */
+function act(name, data) {
+  if (role === 'guest') { if (hostConn && hostConn.open) hostConn.send({ t: 'act', act: name, data }); }
+  else if (S) handleAct(me, name, data);
+}
+
+function leave(msg) {
+  if (role === 'guest' && hostConn && hostConn.open) { try { hostConn.send({ t: 'bye' }); } catch (e) { /* skip */ } }
+  if (role === 'host') conns.forEach(c => { try { c.send({ t: 'closed' }); } catch (e) { /* skip */ } });
+  token++; clearTimeout(timer);
+  clearTimeout(retryTimer); clearTimeout(fallbackTimer); clearTimeout(giveUpTimer); clearInterval(helloIv); clearInterval(beatIv); helloIv = 0;
+  const p = peer; setTimeout(() => { try { p && p.destroy(); } catch (e) { /* skip */ } }, 300);
+  setTimeout(relayStop, 300);
+  relayConns.clear(); conns.clear(); link = null; peer = null; hostConn = null;
+  if (role === 'host') setItem(LS, 'fr-host', null);
+  if (role === 'guest') setItem(LS, 'fr-guest', null);
+  role = null; S = null; V = null; roomCode = ''; animInit = false;
+  homeMsg = msg || ''; homeErr = !!msg;
+  setNet('');
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  closeModal();
+  render();
+}
+
+/* ================= rendering ================= */
+function myPlayer() { return V && V.me >= 0 ? V.players[V.me] : null; }
+function isRoomHost() { return role === 'host' || role === 'solo'; }
+function myTurn() { return !!(V && V.phase === 'play' && V.turn === V.me); }
+
+function render() {
+  const screen = !role || (role === 'guest' && !V) ? 'home' : V && V.phase === 'lobby' ? 'lobby' : 'game';
+  if (screen !== 'game') { document.title = 'Four in a Row · Game Night'; wasMyTurn = false; if (screen === 'home' && wakeLock) { try { wakeLock.release(); } catch (e) { /* skip */ } wakeLock = null; } }
+  $('home').hidden = screen !== 'home';
+  $('lobby').hidden = screen !== 'lobby';
+  $('app').hidden = screen !== 'game';
+  if (screen === 'home') renderHome();
+  else if (screen === 'lobby') renderLobby();
+  else renderGame();
+}
+
+function renderNet() {
+  const el = $('net');
+  el.textContent = role === 'host' || role === 'guest' ? `· Room ${roomCode} · ${netText}` : '';
+  el.className = 'net' + (netWarn ? ' warn' : '');
+  $('lNet').textContent = netText || ' ';
+}
+
+function renderHome() {
+  if (document.activeElement !== $('hName')) $('hName').value = myName;
+  $('onlineBox').hidden = !onlineOK;
+  $('onlineNote').hidden = onlineOK;
+  const savedHost = getItem(LS, 'fr-host');
+  $('hReopen').hidden = !(savedHost && savedHost.code && role !== 'guest');
+  if (savedHost && savedHost.code) $('hReopen').textContent = `Reopen your room ${savedHost.code}`;
+  const solo = getItem(LS, 'fr-solo');
+  $('hContinue').hidden = !(solo && solo.v === 1 && solo.phase !== 'lobby');
+  $('hCreate').disabled = $('hJoin').disabled = role === 'guest';
+  const m = $('homeMsg');
+  m.textContent = homeMsg; m.className = 'msg' + (homeErr ? ' err' : '');
+}
+
+function shareLink() { return location.origin + location.pathname + '#' + roomCode; }
+
+function renderLobby() {
+  renderNet();
+  $('lCode').textContent = roomCode;
+  $('lLink').textContent = shareLink();
+  $('lCopy').textContent = navigator.share ? 'Share link' : 'Copy link';
+  const host = role === 'host';
+  const n = V.players.length;
+  $('lCount').textContent = `Players (${n} of 2)`;
+  $('lPlayers').innerHTML = V.players.map((p, i) => {
+    const tag = p.id === V.hostId ? 'Host' : p.bot ? 'Computer' : p.online ? '' : 'Away';
+    const rm = host && p.id !== V.hostId ? `<button class="x" type="button" data-remove="${esc(p.id)}" aria-label="Remove ${esc(p.name)}">Remove</button>` : '';
+    return `<li><span class="disc-dot p${i}${p.online || p.bot ? '' : ' off'}" aria-hidden="true"></span><span class="nm">${esc(p.name)}${p.id === me ? ' (you)' : ''}</span><span class="note">${tag}</span>${rm}</li>`;
+  }).join('') + (V.waiting.length ? `<li><span class="nm note">Waiting: ${esc(V.waiting.join(', '))}</span></li>` : '');
+  $('lHost').hidden = !host;
+  $('lLevel').value = V.level;
+  $('lLevelBox').hidden = !V.players.some(p => p.bot) && n >= 2;
+  $('lAddBot').hidden = n >= 2;
+  $('lStart').disabled = n < MIN_PLAYERS;
+  $('lNote').textContent = host
+    ? (n < 2 ? 'Share the code with a friend, or play the computer.' : 'Ready when you are.')
+    : 'Waiting for the host to start.';
+}
+
+function renderGame() {
+  if (!V) return;
+  renderNet();
+  $('gameNo').textContent = 'Game ' + V.game;
+  renderVs();
+  renderBoard();
+  renderBar();
+  turnSignal(); keepAwake();
+}
+
+function renderVs() {
+  const pl = (i) => {
+    const p = V.players[i];
+    if (!p) return '<div></div>';
+    const turn = V.phase === 'play' && V.turn === i;
+    const tag = p.bot ? '<small>CPU</small>' : !p.online ? '<small class="away">AWAY</small>' : i === V.me ? '<small>YOU</small>' : '';
+    return `<div class="pl p${i}${i === 1 ? ' right' : ''}${turn ? ' is-turn' : ''}">
+      <span class="disc-dot p${i}" aria-hidden="true"></span>
+      <div class="pl-text"><div class="pl-name">${esc(p.name)}${tag}</div><div class="pl-sub">${turn ? 'to move' : COLOR[i]}${p.bot ? ' · ' + LEVEL_NAME[V.level] : ''}</div></div>
+    </div>`;
+  };
+  const a = V.players[0] ? V.players[0].wins : 0, b = V.players[1] ? V.players[1].wins : 0;
+  $('vs').innerHTML = pl(0) + `<div class="score" aria-label="Score ${a} to ${b}">${a}–${b}</div>` + pl(1);
+}
+
+function renderBoard() {
+  const b = V.board, mine = myTurn();
+  const lastI = V.last ? V.last.r * W + V.last.c : -1;
+  const fresh = V.last && V.last.seq > animSeq && animInit;
+  if (!animInit) { animInit = true; animSeq = V.last ? V.last.seq : 0; }
+  else if (V.last) animSeq = Math.max(animSeq, V.last.seq);
+  const win = new Set(V.win || []);
+  let html = '';
+  for (let c = 0; c < W; c++) {
+    const can = mine && dropRow(b, c) >= 0;
+    html += `<button class="col${can ? ' can' : ''}" type="button" data-c="${c}"${can ? '' : ' disabled'} aria-label="Column ${c + 1}${dropRow(b, c) < 0 ? ', full' : ''}">`;
+    for (let r = 0; r < H; r++) {
+      const i = r * W + c, v = b[i];
+      let disc = '';
+      if (v >= 0) {
+        const cls = ['disc', 'p' + v];
+        if (win.has(i)) cls.push('win');
+        else if (i === lastI && V.phase === 'play') cls.push('last');
+        let st = '';
+        if (i === lastI && fresh) { cls.push('drop'); st = ` style="--from:${-(r + 1) * 105}%;--dur:${(0.18 + r * 0.06).toFixed(2)}s"`; }
+        disc = `<span class="${cls.join(' ')}"${st}></span>`;
+      }
+      html += `<span class="cell">${disc}</span>`;
+    }
+    html += '</button>';
+  }
+  $('board').innerHTML = html;
+  $('board').classList.toggle('dim', !!V.win);
+}
+
+function renderBar() {
+  const mp = myPlayer(), cur = V.players[V.turn];
+  const mine = myTurn();
+  $('bar').classList.toggle('my-turn', mine);
+  let status = '', sub = '';
+  if (V.phase === 'over') {
+    const w = V.result.winner;
+    status = w == null ? "It's a draw." : w === V.me ? 'You win!' : `${V.players[w].name} wins.`;
+    sub = w == null ? 'The board filled up with no four in a row.' : `Four in a row for ${COLOR[w].toLowerCase()}.`;
+  } else if (!mp) { status = `${cur.name} to move.`; sub = 'You are watching. You can play when a seat opens.'; }
+  else if (mine) { status = 'Your move.'; sub = 'Tap a column to drop a disc.'; }
+  else { status = `${cur.name} to move.`; sub = cur.bot ? 'The computer is thinking.' : !cur.online ? 'Away: the computer moves for them soon.' : 'Waiting for their move.'; }
+  $('status').textContent = status;
+  $('sub').textContent = sub;
+  const canNext = V.phase === 'over' && (isRoomHost() || V.me >= 0);
+  $('btnNext').hidden = !canNext;
+}
+
+let wasMyTurn = false, wakeLock = null;
+function turnSignal() {
+  const mine = myTurn();
+  document.title = mine ? 'Your move · Four in a Row' : 'Four in a Row · Game Night';
+  if (mine && !wasMyTurn && role !== 'solo') { try { navigator.vibrate && navigator.vibrate(80); } catch (e) { /* not supported */ } }
+  wasMyTurn = mine;
+}
+function keepAwake() {
+  const want = !!(V && V.phase !== 'lobby') && document.visibilityState === 'visible';
+  if (want && !wakeLock && navigator.wakeLock) {
+    navigator.wakeLock.request('screen').then(l => { wakeLock = l; l.addEventListener('release', () => { wakeLock = null; }); }).catch(() => {});
+  } else if (!want && wakeLock) { try { wakeLock.release(); } catch (e) { /* skip */ } wakeLock = null; }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
+
+/* ================= modals ================= */
+function openModal(html) { $('sheet').innerHTML = html; $('modal').hidden = false; const f = $('sheet').querySelector('button, input, select'); if (f) f.focus(); }
+function closeModal() { $('modal').hidden = true; $('sheet').innerHTML = ''; }
+
+function openRules() {
+  openModal(`<h2>How to <span>play</span></h2>
+  <p class="lede">Two players, one upright board of 7 columns and 6 rows.</p>
+  <ul class="rules">
+    <li><b>Your move.</b> Tap a column. Your disc falls to the lowest empty space in it.</li>
+    <li><b>Winning.</b> The first to get four of their discs in a line wins: across, up and down, or diagonally.</li>
+    <li><b>Draw.</b> If all 42 spaces fill up with no four in a row, the game is a draw.</li>
+    <li><b>Taking turns.</b> Red and yellow alternate. Whoever went second goes first in the next game.</li>
+    <li><b>The computer.</b> Easy makes mistakes, Medium plays sensibly, Hard looks eight moves ahead.</li>
+    <li><b>Online rooms.</b> One phone creates a room and shares the 4-letter code. If your friend drops out, the computer moves for them until they come back.</li>
+  </ul>
+  <div class="sheet-actions"><button class="btn primary" type="button" data-close>Got it</button></div>`);
+}
+function openScores() {
+  if (!V) return;
+  openModal(`<h2>Match <span>score</span></h2>
+    <p class="lede">${V.game} game${V.game === 1 ? '' : 's'} played${V.draws ? `, ${V.draws} drawn` : ''}.</p>
+    <ol class="order">${V.players.map((p, i) => `<li class="${i === V.me ? 'me-row' : ''}"><span class="disc-dot p${i}"></span><span class="nm">${esc(p.name)}</span><span class="pts">${p.wins}<small>win${p.wins === 1 ? '' : 's'}</small></span></li>`).join('')}</ol>
+    <div class="sheet-actions">${role === 'host' && V.phase === 'over' ? '<button class="btn" type="button" id="mLobby">Back to lobby</button>' : ''}<button class="btn primary" type="button" data-close>Close</button></div>`);
+}
+function openLeave() {
+  const msg = role === 'host' ? 'This closes the room for everyone in it.' : role === 'guest' ? 'The computer moves for you while you are gone. You can rejoin with the same code and name.' : 'Your game is saved. You can continue it from the start screen.';
+  openModal(`<h2>${role === 'host' ? 'Close the <span>room</span>?' : role === 'guest' ? 'Leave the <span>room</span>?' : 'Quit to the <span>start screen</span>?'}</h2>
+    <p class="lede">${msg}</p>
+    <div class="sheet-actions"><button class="btn" type="button" data-close>Stay</button><button class="btn primary" type="button" id="mLeave">${role === 'host' ? 'Close room' : role === 'guest' ? 'Leave' : 'Quit to start screen'}</button></div>`);
+}
+
+/* ================= starting things ================= */
+function readName() {
+  const v = ($('hName').value || '').trim().slice(0, 14);
+  if (!v) { homeMsg = 'Type your name first.'; homeErr = true; renderHome(); $('hName').focus(); return false; }
+  myName = v; setItem(LS, 'fr-name', v);
+  return true;
+}
+function startSolo() {
+  if (!readName()) return;
+  const level = $('hLevel').value;
+  setItem(LS, 'fr-level', level);
+  role = 'solo'; S = baseState('solo', level); animInit = false;
+  S.players.push(newPlayer(me, myName, false));
+  S.players.push(newPlayer('bot-' + rid(), BOT_NAMES[level], true));
+  newGame();
+}
+function continueSolo() {
+  const s = getItem(LS, 'fr-solo');
+  if (!s || s.v !== 1) return;
+  role = 'solo'; S = s; S.hostId = me; animInit = false;
+  const hp = S.players.find(p => !p.bot); if (hp) { hp.id = me; hp.online = true; }
+  normalizeHost();
+  changed();
+}
+function createRoom() {
+  if (!readName()) return;
+  if (waitNet(createRoom)) return;
+  if (!netReady()) { homeMsg = "Couldn't load the connection tools. Check your internet and reload."; homeErr = true; renderHome(); return; }
+  role = 'host'; roomCode = newCode(); hostSess = rid(); animInit = false;
+  S = baseState('room', getItem(LS, 'fr-level'));
+  S.players.push(newPlayer(me, myName, false));
+  history.replaceState(null, '', '#' + roomCode);
+  openHostPeer(); startHostRelay();
+  changed();
+}
+function reopenRoom() {
+  const g = getItem(LS, 'fr-host');
+  if (!g || !g.S) return;
+  if (!readName()) return;
+  if (waitNet(reopenRoom)) return;
+  if (!netReady()) { homeMsg = "Couldn't load the connection tools. Check your internet and reload."; homeErr = true; renderHome(); return; }
+  role = 'host'; roomCode = g.code; hostSess = rid(); S = g.S; animInit = false;
+  const hp = S.players.find(p => p.id === S.hostId) || S.players.find(p => !p.bot);
+  if (hp) { hp.id = me; hp.name = myName; }
+  S.hostId = me;
+  history.replaceState(null, '', '#' + roomCode);
+  openHostPeer(); startHostRelay();
+  normalizeHost();
+  changed();
+}
+function joinFromForm() {
+  if (!readName()) return;
+  const code = ($('hCode').value || '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (code.length !== 4) { homeMsg = 'Room codes are 4 letters.'; homeErr = true; renderHome(); return; }
+  if (waitNet(joinFromForm)) return;
+  if (!netReady()) { homeMsg = "Couldn't load the connection tools. Check your internet and reload."; homeErr = true; renderHome(); return; }
+  history.replaceState(null, '', '#' + code);
+  animInit = false;
+  joinRoom(code);
+}
+
+/* ================= events ================= */
+$('hSolo').addEventListener('click', startSolo);
+$('hContinue').addEventListener('click', () => { if (readName()) continueSolo(); });
+$('hCreate').addEventListener('click', createRoom);
+$('hReopen').addEventListener('click', reopenRoom);
+$('joinForm').addEventListener('submit', e => { e.preventDefault(); joinFromForm(); });
+$('hRules').addEventListener('click', openRules);
+$('hName').addEventListener('input', () => { if (homeErr) { homeMsg = ''; homeErr = false; $('homeMsg').textContent = ''; } });
+$('hLevel').value = DEPTH[getItem(LS, 'fr-level')] ? getItem(LS, 'fr-level') : 'medium';
+
+$('lAddBot').addEventListener('click', () => act('addBot'));
+$('lStart').addEventListener('click', () => act('start'));
+$('lLevel').addEventListener('change', e => { setItem(LS, 'fr-level', e.target.value); act('settings', { level: e.target.value }); });
+$('lPlayers').addEventListener('click', e => { const b = e.target.closest('[data-remove]'); if (b) act('remove', { id: b.dataset.remove }); });
+$('lRules').addEventListener('click', openRules);
+$('lLeave').addEventListener('click', openLeave);
+$('lCopy').addEventListener('click', () => {
+  const link = shareLink(), msg = $('lCopyMsg');
+  const done = t => { msg.textContent = t; setTimeout(() => { msg.textContent = ''; }, 2500); };
+  if (navigator.share) {
+    navigator.share({ title: 'Four in a Row', text: `Play Four in a Row with me. Code: ${roomCode}`, url: link }).catch(() => {});
+    return;
+  }
+  const pick = () => { const r = document.createRange(); r.selectNodeContents($('lLink')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); done('Link selected. Copy it from here.'); };
+  try { navigator.clipboard.writeText(link).then(() => done('Link copied. Send it to your friend.'), pick); } catch (e) { pick(); }
+});
+
+$('board').addEventListener('click', e => {
+  const col = e.target.closest('.col');
+  if (!col || col.disabled || !myTurn()) return;
+  act('drop', { c: +col.dataset.c });
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !$('modal').hidden) { closeModal(); return; }
+  if (/^[1-7]$/.test(e.key) && $('modal').hidden && myTurn()) act('drop', { c: +e.key - 1 });
+});
+$('btnNext').addEventListener('click', () => act('next'));
+$('btnRules').addEventListener('click', openRules);
+$('btnScores').addEventListener('click', openScores);
+$('btnLeave').addEventListener('click', openLeave);
+$('btnMenu').addEventListener('click', () => {
+  openModal(`<h2>Menu</h2>
+    <div class="menu-list">
+      <button class="btn" type="button" id="mmRules">Rules</button>
+      <button class="btn" type="button" id="mmScores">Score</button>
+      <button class="btn" type="button" id="mmLeave">${role === 'host' ? 'Close room' : role === 'guest' ? 'Leave room' : 'Quit to start screen'}</button>
+    </div>
+    <div class="sheet-actions"><button class="btn primary" type="button" data-close>Back to the game</button></div>`);
+});
+$('modal').addEventListener('click', e => {
+  if (e.target === $('modal') || e.target.closest('[data-close]')) closeModal();
+  else if (e.target.closest('#mmRules')) openRules();
+  else if (e.target.closest('#mmScores')) openScores();
+  else if (e.target.closest('#mmLeave')) openLeave();
+  else if (e.target.closest('#mLobby')) { closeModal(); act('lobby'); }
+  else if (e.target.closest('#mLeave')) {
+    closeModal();
+    if (role === 'solo') { token++; clearTimeout(timer); role = null; S = null; V = null; homeMsg = ''; homeErr = false; render(); }
+    else leave();
+  }
+});
+window.addEventListener('pagehide', () => { if (role === 'guest' && hostConn && hostConn.open) { try { hostConn.send({ t: 'away' }); } catch (e) { /* skip */ } } });
+window.addEventListener('beforeunload', e => { if (role === 'host' && conns.size) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ================= boot ================= */
+(function boot() {
+  const hashCode = (location.hash || '').replace('#', '').toUpperCase().replace(/[^A-Z]/g, '');
+  if (hashCode.length === 4) $('hCode').value = hashCode;
+  const savedGuest = getItem(LS, 'fr-guest');
+  const savedHost = getItem(LS, 'fr-host');
+  render();
+  if (!onlineOK) return;
+  NET.then(() => {
+    if (role) return;
+    if (myName && savedHost && savedHost.code && hashCode === savedHost.code && netReady()) { reopenRoom(); return; }
+    if (myName && savedGuest && savedGuest.code && (!hashCode || hashCode === savedGuest.code) && netReady()) { joinRoom(savedGuest.code); return; }
+    if (hashCode.length === 4) { homeMsg = myName ? `Tap Join room to join room ${hashCode}.` : `Type your name, then tap Join room to join room ${hashCode}.`; renderHome(); }
+  });
+})();
+})();
+</script>
+
+</html>
